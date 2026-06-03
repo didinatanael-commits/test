@@ -1109,6 +1109,19 @@
             if(maintSelect) maintSelect.addEventListener("change", executeAdvancedFilter);
             if(statusSelect) statusSelect.addEventListener("change", executeAdvancedFilter);
             if(monthSelect) monthSelect.addEventListener("change", executeAdvancedFilter);
+
+            // --- SEGMEN INTEGRASI: Pelacak Aktivitas untuk Auto Logout ---
+            function refreshActivityTimer() {
+                if (localStorage.getItem("current_logged_user")) {
+                    localStorage.setItem("last_activity_time", Date.now());
+                }
+            }
+
+            // Daftarkan event interaksi user sebagai "Aktivitas"
+            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+            activityEvents.forEach(eventName => {
+                document.addEventListener(eventName, refreshActivityTimer, true);
+            });
         });
 </script>
 </body>
