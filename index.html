@@ -874,6 +874,58 @@
         }
 
         // ==========================================
+        // SINKRONISASI UTAMA & LOGIKA KONEKSI GOOGLE SHEETS
+        // ==========================================
+        async function syncDataWithSheets(showNotice = false) {
+            if(showNotice) showLoading("Sinkronisasi Cloud Database...");
+            try {
+                const rangeValue = document.getElementById("sync-range") ? document.getElementById("sync-range").value : "all";
+                const response = await fetch(`${SCRIPT_URL}?range=${rangeValue}`);
+                const res = await response.json();
+                
+                if(res.status === "success") {
+                    logbookData = res.logbook || [];
+                    usersData = res.users || [];
+                    specialtiesData = res.specialties || [];
+                    maintenancesData = res.maintenances || [];
+                    
+                    renderLogbookTable();
+                    renderUsersTable();
+                    renderSettingsLists();
+                    updateParametersDropdown();
+                    if(showNotice) triggerSuccessPopUp("Sinkronisasi Berhasil!", "Data lokal Anda kini sejalan dengan database server cloud.");
+                }
+            } catch(e) {
+                console.error("Gagal melakukan sync dengan Google Sheets:", e);
+                showAlert("Gagal terhubung dengan Google Sheets cloud database.", "error");
+            } finally {
+                if(showNotice) hideLoading();
+            }
+        }
+
+        // ==========================================
+        // LOGIKA AUTENTIKASI LOGIN & NAVIGASI
+        // ==========================================
+        function login(username, password) {
+            const user = usersData.find(u => u.username === username && u.password === password);
+            if(user) {
+                currentUser = user;
+                localStorage.setItem("current_logged_user", JSON.stringify(user));
+                localStorage.setItem("last_activity_time", Date.now()); // Set waktu aktivitas pertama kali
+                showDashboard();
+            } else {
+                showAlert("Username atau password salah!", "error");
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("current_logged_user");
+            localStorage.removeItem("last_activity_time");
+            currentUser = null;
+            showLogin();
+        }
+
+        // ==========================================
         // INITIALIZATION & SESSION TIMEOUT CHECK
         // ==========================================
         function initApp() {
@@ -881,7 +933,7 @@
             if (savedUser) {
                 const lastActivity = localStorage.getItem("last_activity_time");
                 const currentTime = Date.now();
-                const timeoutLimit = 30 * 60 * 1000; // Batas waktu: 30 Menit dalam milidetik
+                const timeoutLimit = 30 * 60 * 1000; // Batas waktu: 30 Menit
 
                 if (lastActivity && (currentTime - lastActivity > timeoutLimit)) {
                     // Sesi hangus akibat tidak ada pergerakan/aktivitas
@@ -902,7 +954,6 @@
                 showLogin(); 
             }
         }
-		
 		
 		
 		
