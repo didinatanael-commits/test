@@ -819,20 +819,26 @@
         // PENGATURAN PARAMETER DROPDOWN FORM
         // ==========================================
         function renderSettingsLists() {
-            document.getElementById("list-specialties").innerHTML = specialtiesData.map(s => `
-                <li class="py-2.5 px-3 flex justify-between items-center hover:bg-white rounded-xl transition">
-                    <span class="text-slate-700 font-bold">${s.name}</span>
-                    <button onclick="deleteParamConfirm('Specialty', '${s.name.replace(/'/g, "\\'")}')" title="Hapus" class="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition inline-flex items-center"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                </li>
-            `).join('');
-            
-            document.getElementById("list-maintenances").innerHTML = maintenancesData.map(m => `
-                <li class="py-2.5 px-3 flex justify-between items-center hover:bg-white rounded-xl transition">
-                    <span class="text-slate-700 font-bold">${m.name}</span>
-                    <button onclick="deleteParamConfirm('Maintenance', '${m.name.replace(/'/g, "\\'")}')" title="Hapus" class="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition inline-flex items-center"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                </li>
-            `).join('');
-            lucide.createIcons();
+            try {
+                if(document.getElementById("list-specialties")) {
+                    document.getElementById("list-specialties").innerHTML = specialtiesData.map(s => `
+                        <li class="py-2.5 px-3 flex justify-between items-center hover:bg-white rounded-xl transition">
+                            <span class="text-slate-700 font-bold">${s.name}</span>
+                            <button onclick="deleteParamConfirm('Specialty', '${s.name.replace(/'/g, "\\'")}')" title="Hapus" class="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition inline-flex items-center"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </li>
+                    `).join('');
+                }
+                
+                if(document.getElementById("list-maintenances")) {
+                    document.getElementById("list-maintenances").innerHTML = maintenancesData.map(m => `
+                        <li class="py-2.5 px-3 flex justify-between items-center hover:bg-white rounded-xl transition">
+                            <span class="text-slate-700 font-bold">${m.name}</span>
+                            <button onclick="deleteParamConfirm('Maintenance', '${m.name.replace(/'/g, "\\'")}')" title="Hapus" class="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition inline-flex items-center"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </li>
+                    `).join('');
+                }
+                if(window.lucide) lucide.createIcons();
+            } catch(err) { console.warn("Render settings list ditunda:", err); }
         }
 
         async function addParameterItem(type) {
@@ -854,27 +860,8 @@
             }
         }
 
-        function deleteParamConfirm(type, name) {
-            const displayType = type === 'Specialty' ? 'Spesialisasi' : 'Tipe Maintenance';
-            triggerPopUp('delete', 'Hapus Parameter', `Hapus "${name}" dari kelompok parameter ${displayType}?`, async () => {
-                showLoading("Menghapus Parameter...");
-                try {
-                    const r = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "delete" + type, name: name }) });
-                    const res = await r.json();
-                    if(res.status === "success") {
-                        await syncDataWithSheets(false);
-                        triggerSuccessPopUp("Parameter Dihapus!", `Item "${name}" telah dikeluarkan dari opsi logbook.`);
-                    }
-                } catch(e) { 
-                    showAlert("Gagal.", "error"); 
-                } finally {
-                    hideLoading();
-                }
-            });
-        }
-
         // ==========================================
-        // SINKRONISASI UTAMA & LOGIKA KONEKSI GOOGLE SHEETS
+        // SINKRONISASI UTAMA & KONEKSI GOOGLE SHEETS (ERROR-SAFE)
         // ==========================================
         async function syncDataWithSheets(showNotice = false) {
             if(showNotice) showLoading("Sinkronisasi Cloud Database...");
@@ -889,10 +876,11 @@
                     specialtiesData = res.specialties || [];
                     maintenancesData = res.maintenances || [];
                     
-                    renderLogbookTable();
-                    renderUsersTable();
-                    renderSettingsLists();
-                    updateParametersDropdown();
+                    try { if(typeof renderLogbookTable === "function") renderLogbookTable(); } catch(e){}
+                    try { if(typeof renderUsersTable === "function") renderUsersTable(); } catch(e){}
+                    try { renderSettingsLists(); } catch(e){}
+                    try { if(typeof updateParametersDropdown === "function") updateParametersDropdown(); } catch(e){}
+                    
                     if(showNotice) triggerSuccessPopUp("Sinkronisasi Berhasil!", "Data lokal Anda kini sejalan dengan database server cloud.");
                 }
             } catch(e) {
@@ -907,14 +895,28 @@
         // LOGIKA AUTENTIKASI LOGIN & NAVIGASI
         // ==========================================
         function login(username, password) {
-            const user = usersData.find(u => u.username === username && u.password === password);
+            if (!usersData || usersData.length === 0) {
+                showAlert("Data user belum siap atau sedang diunduh. Mohon tunggu beberapa detik lalu coba lagi.", "error");
+                syncDataWithSheets(false);
+                return;
+            }
+
+            const unInput = username.trim().toLowerCase();
+            const pwInput = password.trim();
+
+            const user = usersData.find(u => {
+                const sheetUser = u.username ? u.username.toString().trim().toLowerCase() : "";
+                const sheetPass = u.password ? u.password.toString().trim() : "";
+                return sheetUser === unInput && sheetPass === pwInput;
+            });
+
             if(user) {
                 currentUser = user;
                 localStorage.setItem("current_logged_user", JSON.stringify(user));
-                localStorage.setItem("last_activity_time", Date.now()); // Set waktu aktivitas pertama kali
+                localStorage.setItem("last_activity_time", Date.now()); 
                 showDashboard();
             } else {
-                showAlert("Username atau password salah!", "error");
+                showAlert("Username atau password salah! Periksa kembali akun Anda.", "error");
             }
         }
 
@@ -928,15 +930,18 @@
         // ==========================================
         // INITIALIZATION & SESSION TIMEOUT CHECK
         // ==========================================
-        function initApp() {
+        async function initApp() {
+            showLoading("Menyiapkan Sistem...");
+            await syncDataWithSheets(false);
+            hideLoading();
+
             const savedUser = localStorage.getItem("current_logged_user");
             if (savedUser) {
                 const lastActivity = localStorage.getItem("last_activity_time");
                 const currentTime = Date.now();
-                const timeoutLimit = 30 * 60 * 1000; // Batas waktu: 30 Menit
+                const timeoutLimit = 30 * 60 * 1000; 
 
                 if (lastActivity && (currentTime - lastActivity > timeoutLimit)) {
-                    // Sesi hangus akibat tidak ada pergerakan/aktivitas
                     localStorage.removeItem("current_logged_user");
                     localStorage.removeItem("last_activity_time");
                     currentUser = null;
@@ -945,7 +950,6 @@
                         showAlert("Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan login kembali.", "error");
                     }, 500);
                 } else {
-                    // Masih aktif, perbarui penanda waktu ke saat ini dan buka dashboard
                     localStorage.setItem("last_activity_time", currentTime);
                     currentUser = JSON.parse(savedUser); 
                     showDashboard();
@@ -954,7 +958,6 @@
                 showLogin(); 
             }
         }
-		
 		
 		
 		
