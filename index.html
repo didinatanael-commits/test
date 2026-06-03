@@ -872,6 +872,36 @@
                 }
             });
         }
+
+        // ==========================================
+        // INITIALIZATION & SESSION TIMEOUT CHECK
+        // ==========================================
+        function initApp() {
+            const savedUser = localStorage.getItem("current_logged_user");
+            if (savedUser) {
+                const lastActivity = localStorage.getItem("last_activity_time");
+                const currentTime = Date.now();
+                const timeoutLimit = 30 * 60 * 1000; // Batas waktu: 30 Menit dalam milidetik
+
+                if (lastActivity && (currentTime - lastActivity > timeoutLimit)) {
+                    // Sesi hangus akibat tidak ada pergerakan/aktivitas
+                    localStorage.removeItem("current_logged_user");
+                    localStorage.removeItem("last_activity_time");
+                    currentUser = null;
+                    showLogin();
+                    setTimeout(() => {
+                        showAlert("Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan login kembali.", "error");
+                    }, 500);
+                } else {
+                    // Masih aktif, perbarui penanda waktu ke saat ini dan buka dashboard
+                    localStorage.setItem("last_activity_time", currentTime);
+                    currentUser = JSON.parse(savedUser); 
+                    showDashboard();
+                }
+            } else { 
+                showLogin(); 
+            }
+        }
 		
 		
 		
