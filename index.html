@@ -456,9 +456,22 @@
 
         function initApp() {
             const savedUser = localStorage.getItem("current_logged_user");
-            if (savedUser) { 
-                currentUser = JSON.parse(savedUser); 
-                showDashboard(); 
+            if (savedUser) {
+                // Cek waktu aktivitas terakhir
+                const lastActivity = localStorage.getItem("last_activity_time");
+                const currentTime = Date.now();
+                const timeoutLimit = 30 * 60 * 1000; // 30 Menit dalam milidetik (Ganti angka 30 jika ingin ubah menitnya)
+
+                if (lastActivity && (currentTime - lastActivity > timeoutLimit)) {
+                    // Jika melebihi batas waktu, paksa logout
+                    showAlert("Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan login kembali.", "error");
+                    logout();
+                } else {
+                    // Jika masih aman, perbarui waktu aktivitas dan masuk ke dashboard
+                    localStorage.setItem("last_activity_time", currentTime);
+                    currentUser = JSON.parse(savedUser); 
+                    showDashboard();
+                }
             } else { 
                 showLogin(); 
             }
